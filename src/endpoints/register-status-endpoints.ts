@@ -145,7 +145,7 @@ export function registerStatusEndpoints(app: Express, yamahaState: YamahaConnect
     }
 
     try {
-      const programs = await client.getSoundPrograms();
+      const programs = await client.getSoundProgramList();
       res.json(programs);
     } catch (error) {
       logger.error({ err: error }, 'Error fetching sound programs.');
@@ -183,7 +183,7 @@ export function registerStatusEndpoints(app: Express, yamahaState: YamahaConnect
     }
 
     try {
-      const inputData = await client.getInputList();
+      const inputData = await client.getListInfo();
       const inputs = Array.isArray(inputData?.inputs)
         ? inputData.inputs
         : Array.isArray(inputData)
@@ -239,6 +239,94 @@ export function registerStatusEndpoints(app: Express, yamahaState: YamahaConnect
     } catch (error) {
       logger.error({ err: error }, 'Error fetching volume.');
       res.status(500).send('Error fetching volume');
+    }
+  });
+
+  /**
+   * @openapi
+   * /features:
+   *   get:
+   *     tags:
+   *       - Status
+   *     summary: Pobiera możliwości urządzenia Yamaha
+   *     description: |
+   *       Zwraca wynik Yamaha `system/getFeatures`, czyli statyczny opis możliwości amplitunera.
+   *       Odpowiedź zawiera między innymi:
+   *       - listę wejść w `system.input_list`
+   *       - listę wejść dostępnych dla każdej strefy w `zone[].input_list`
+   *       - listę funkcji dostępnych w urządzeniu i strefach
+   *       - dostępne programy dźwiękowe, zakresy regulacji i funkcje tunera/netusb
+   *
+   *       Do ustawiania źródła należy używać technicznych identyfikatorów wejść, np. `tv`, `tuner`, `audio1`, `usb`, `hdmi1`.
+   *     responses:
+   *       200:
+   *         description: Pełny opis funkcji i wejść obsługiwanych przez amplituner
+   *         content:
+   *           application/json:
+   *             schema:
+   *               $ref: '#/components/schemas/YamahaFeaturesResponse'
+   *       500:
+   *         description: Error fetching features
+   *       503:
+   *         description: Yamaha device unavailable
+   *         content:
+   *           application/json:
+   *             schema:
+   *               $ref: '#/components/schemas/ErrorResponse'
+   */
+  app.get('/features', async (req, res) => {
+    const client = getYamahaOrRespond(yamahaState, res);
+    if (!client) {
+      return;
+    }
+
+    try {
+      const features = await client.getFeatures();
+      res.json(features);
+    } catch (error) {
+      logger.error({ err: error }, 'Error fetching features.');
+      res.status(500).send('Error fetching features');
+    }
+  });
+
+  /**
+   * @openapi
+   * /location-info:
+   *   get:
+   *     tags:
+   *       - Status
+   *     summary: Pobiera informacje o lokalizacji urządzenia Yamaha
+   *     description: |
+   *       Zwraca wynik Yamaha `system/getLocationInfo`.
+   *       Endpoint zwraca identyfikator lokalizacji MusicCast, nazwę lokalizacji oraz mapę stref przypisanych do tej lokalizacji.
+   *     responses:
+   *       200:
+   *         description: Informacje o lokalizacji urządzenia
+   *         content:
+   *           application/json:
+   *             schema:
+   *               $ref: '#/components/schemas/LocationInfoResponse'
+   *       500:
+   *         description: Error fetching location info
+   *       503:
+   *         description: Yamaha device unavailable
+   *         content:
+   *           application/json:
+   *             schema:
+   *               $ref: '#/components/schemas/ErrorResponse'
+   */
+  app.get('/location-info', async (req, res) => {
+    const client = getYamahaOrRespond(yamahaState, res);
+    if (!client) {
+      return;
+    }
+
+    try {
+      const locationInfo = await client.getLocationInfo();
+      res.json(locationInfo);
+    } catch (error) {
+      logger.error({ err: error }, 'Error fetching location info.');
+      res.status(500).send('Error fetching location info');
     }
   });
 }
