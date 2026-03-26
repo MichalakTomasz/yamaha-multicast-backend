@@ -4,6 +4,7 @@ import { registerEndpoints } from './endpoints';
 import { YamahaConnectionState } from './models';
 import { createYamahaYXC } from './services';
 import { setupSwagger } from './swagger';
+import { logger } from './pino';
 
 const port = 3000;
 
@@ -29,5 +30,5 @@ async function bootstrap() {
 }
 
 bootstrap().catch((error) => {
-  console.error('Server startup failed:', error);
+  logger.error({ err: error }, 'Server startup failed.');
 });

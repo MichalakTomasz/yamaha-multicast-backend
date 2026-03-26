@@ -1,6 +1,7 @@
 import { isIP } from 'node:net';
 import yamahaYXC from 'yamaha-yxc-nodejs';
 import { getSavedYamahaIp, saveYamahaIp } from './app-config-service';
+import { logger } from '../pino';
 
 type YamahaClient = any;
 export type YamahaConnectionSource = 'saved' | 'discovery' | 'manual';
@@ -28,7 +29,7 @@ export async function createYamahaYXCFromIp(ip: string): Promise<YamahaClient | 
   const trimmedIp = ip.trim();
 
   if (!isValidYamahaIp(trimmedIp)) {
-    console.warn(`Yamaha client creation failed: invalid IP address \"${ip}\".`);
+    logger.warn({ ip }, 'Yamaha client creation failed: invalid IP address.');
     return null;
   }
 
@@ -41,13 +42,13 @@ export async function createYamahaYXCFromIp(ip: string): Promise<YamahaClient | 
     try {
       await saveYamahaIp(trimmedIp);
     } catch (error) {
-      console.warn(`Saving Yamaha IP ${trimmedIp} to app-config.json failed:`, error);
+      logger.warn({ err: error, ip: trimmedIp }, 'Saving Yamaha IP to app-config.json failed.');
     }
 
-    console.log(`Yamaha connection verified for ${trimmedIp}`);
+    logger.info({ ip: trimmedIp }, 'Yamaha connection verified.');
     return client;
   } catch (error) {
-    console.warn(`Yamaha client verification failed for ${trimmedIp}:`, error);
+    logger.warn({ err: error, ip: trimmedIp }, 'Yamaha client verification failed.');
     return null;
   }
 }
@@ -66,7 +67,7 @@ export async function createYamahaYXC(timeout = 5000): Promise<YamahaConnectionR
       };
     }
 
-    console.warn(`Saved Yamaha IP ${savedIp} is unavailable, falling back to discovery.`);
+    logger.warn({ ip: savedIp }, 'Saved Yamaha IP is unavailable, falling back to discovery.');
   }
 
   const YamahaYXC = yamahaYXC.YamahaYXC;
@@ -76,7 +77,7 @@ export async function createYamahaYXC(timeout = 5000): Promise<YamahaConnectionR
     const devices = await probe.discover(timeout);
 
     if (!Array.isArray(devices) || devices.length === 0) {
-      console.warn('Yamaha discovery failed: no devices found on the local network.');
+      logger.warn('Yamaha discovery failed: no devices found on the local network.');
       return {
         client: null,
         ip: null,
@@ -89,7 +90,7 @@ export async function createYamahaYXC(timeout = 5000): Promise<YamahaConnectionR
     );
 
     if (!device) {
-      console.warn('Yamaha discovery failed: discovered entries did not contain a usable IP address.');
+      logger.warn('Yamaha discovery failed: discovered entries did not contain a usable IP address.');
       return {
         client: null,
         ip: null,
@@ -97,8 +98,13 @@ export async function createYamahaYXC(timeout = 5000): Promise<YamahaConnectionR
       };
     }
 
-    console.log(
-      `Yamaha discovery succeeded: ${device.name ?? device.model ?? 'Unknown Yamaha device'} at ${device.ip}`
+    logger.info(
+      {
+        ip: device.ip,
+        deviceName: device.name ?? null,
+        deviceModel: device.model ?? null
+      },
+      'Yamaha discovery succeeded.'
     );
 
     const discoveredClient = await createYamahaYXCFromIp(device.ip);
@@ -109,7 +115,7 @@ export async function createYamahaYXC(timeout = 5000): Promise<YamahaConnectionR
       source: discoveredClient ? 'discovery' : null
     };
   } catch (error) {
-    console.warn('Yamaha discovery failed:', error);
+    logger.warn({ err: error }, 'Yamaha discovery failed.');
     return {
       client: null,
       ip: null,

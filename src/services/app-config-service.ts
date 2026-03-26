@@ -1,5 +1,6 @@
 import { access, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import { logger } from '../pino';
 
 type AppConfig = {
   yamahaIp: string | null;
@@ -32,7 +33,7 @@ export async function readAppConfig(): Promise<AppConfig> {
         : null
     };
   } catch (error) {
-    console.warn('Reading app-config.json failed, using default config:', error);
+    logger.warn({ err: error, path: APP_CONFIG_PATH }, 'Reading app-config.json failed, using default config.');
     return DEFAULT_APP_CONFIG;
   }
 }

@@ -1,6 +1,7 @@
 import { Express } from 'express';
 import { YamahaConnectionState } from '../models';
 import { getYamahaOrRespond, getZone } from './helpers';
+import { logger } from '../pino';
 
 const signalInfoRoutes = ['/signal-info', '/signalInfo'];
 const soundProgramsRoutes = ['/sound-programs', '/soundPrograms'];
@@ -40,7 +41,7 @@ export function registerStatusEndpoints(app: Express, yamahaState: YamahaConnect
       const power = status?.power || status?.power_status || status?.main?.power;
       res.json({ power });
     } catch (error) {
-      console.error('Error fetching power status:', error);
+      logger.error({ err: error }, 'Error fetching power status.');
       res.status(500).send('Error fetching power status');
     }
   });
@@ -109,7 +110,7 @@ export function registerStatusEndpoints(app: Express, yamahaState: YamahaConnect
       const input = await client.getSignalInfo();
       res.json(input);
     } catch (error) {
-      console.error('Error fetching signal info:', error);
+      logger.error({ err: error }, 'Error fetching signal info.');
       res.status(500).send('Error fetching signal info');
     }
   });
@@ -147,7 +148,7 @@ export function registerStatusEndpoints(app: Express, yamahaState: YamahaConnect
       const programs = await client.getSoundPrograms();
       res.json(programs);
     } catch (error) {
-      console.error('Error fetching sound programs:', error);
+      logger.error({ err: error }, 'Error fetching sound programs.');
       res.status(500).send('Error fetching sound programs');
     }
   });
@@ -191,7 +192,7 @@ export function registerStatusEndpoints(app: Express, yamahaState: YamahaConnect
 
       res.json({ inputs });
     } catch (error) {
-      console.error('Error fetching inputs:', error);
+      logger.error({ err: error }, 'Error fetching inputs.');
       res.status(500).send('Error fetching inputs');
     }
   });
@@ -232,11 +233,11 @@ export function registerStatusEndpoints(app: Express, yamahaState: YamahaConnect
     }
 
     try {
-      const zone = getZone(req.query.zone);
-      const volume = await client.getVolume(zone);
+      const status = await client.getStatus();
+      const volume = status?.main?.volume ?? status?.volume;
       res.json(volume);
     } catch (error) {
-      console.error('Error fetching volume:', error);
+      logger.error({ err: error }, 'Error fetching volume.');
       res.status(500).send('Error fetching volume');
     }
   });

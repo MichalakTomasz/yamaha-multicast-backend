@@ -1,6 +1,7 @@
 import { Express } from 'express';
 import { YamahaConnectionState } from '../models';
 import { getSingleValue, getYamahaOrRespond, getZone, parseVolume } from './helpers';
+import { logger } from '../pino';
 
 const soundProgramRoutes = ['/sound-program', '/soundProgram'];
 
@@ -68,7 +69,7 @@ export function registerControlEndpoints(app: Express, yamahaState: YamahaConnec
       await client.setVolumeTo(volume, zone);
       res.json({ message: 'Volume set' });
     } catch (error) {
-      console.error('Error setting volume:', error);
+      logger.error({ err: error }, 'Error setting volume.');
       res.status(500).send('Error setting volume');
     }
   });
@@ -136,7 +137,7 @@ export function registerControlEndpoints(app: Express, yamahaState: YamahaConnec
       await client.setSoundProgramTo(program, zone);
       res.json({ message: 'Sound program set' });
     } catch (error) {
-      console.error('Error setting sound program:', error);
+      logger.error({ err: error }, 'Error setting sound program.');
       res.status(500).send('Error setting sound program');
     }
   });
@@ -204,7 +205,7 @@ export function registerControlEndpoints(app: Express, yamahaState: YamahaConnec
       await client.setInputTo(input, mode);
       res.json({ message: 'Input set' });
     } catch (error) {
-      console.error('Error setting input:', error);
+      logger.error({ err: error }, 'Error setting input.');
       res.status(500).send('Error setting input');
     }
   });
