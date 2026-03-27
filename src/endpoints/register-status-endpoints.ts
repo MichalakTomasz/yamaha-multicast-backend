@@ -1,6 +1,6 @@
 import { Express } from 'express';
 import { YamahaConnectionState } from '../models';
-import { getYamahaOrRespond, getZone } from './helpers';
+import { getSingleValue, getYamahaOrRespond, getZone } from './helpers';
 import { logger } from '../pino';
 
 const signalInfoRoutes = ['/signal-info', '/signalInfo'];
@@ -155,7 +155,7 @@ export function registerStatusEndpoints(app: Express, yamahaState: YamahaConnect
 
   /**
    * @openapi
-   * /inputs:
+   * /input-list:
    *   get:
    *     tags:
    *       - Status
@@ -166,9 +166,9 @@ export function registerStatusEndpoints(app: Express, yamahaState: YamahaConnect
    *         content:
    *           application/json:
    *             schema:
-   *               $ref: '#/components/schemas/InputsResponse'
+   *               $ref: '#/components/schemas/InputListResponse'
    *       500:
-   *         description: Error fetching inputs
+   *         description: Error fetching inputList
    *       503:
    *         description: Yamaha device unavailable
    *         content:
@@ -176,24 +176,21 @@ export function registerStatusEndpoints(app: Express, yamahaState: YamahaConnect
    *             schema:
    *               $ref: '#/components/schemas/ErrorResponse'
    */
-  app.get('/inputs', async (req, res) => {
+  app.get('/input-list', async (req, res) => {
     const client = getYamahaOrRespond(yamahaState, res);
     if (!client) {
       return;
     }
 
     try {
-      const inputData = await client.getListInfo();
-      const inputs = Array.isArray(inputData?.inputs)
-        ? inputData.inputs
-        : Array.isArray(inputData)
-          ? inputData
-          : [];
+      const features = await client.getFeatures();
+      const zone = getZone(req.query.zone);
+      const inputList: [] = features?.zone?.filter((z: any) => z.id === zone)[0]?.input_list;
 
-      res.json({ inputs });
+      res.json({ 'input-list': inputList });
     } catch (error) {
-      logger.error({ err: error }, 'Error fetching inputs.');
-      res.status(500).send('Error fetching inputs');
+      logger.error({ err: error }, 'Error fetching inputList.');
+      res.status(500).send('Error fetching inputList');
     }
   });
 
@@ -327,6 +324,170 @@ export function registerStatusEndpoints(app: Express, yamahaState: YamahaConnect
     } catch (error) {
       logger.error({ err: error }, 'Error fetching location info.');
       res.status(500).send('Error fetching location info');
+    }
+  });
+
+  /**
+   * @openapi
+   * /device-info:
+   *   get:
+   *     tags:
+   *       - Status
+   *     summary: Pobiera informacje o urządzeniu Yamaha
+   *     description: |
+   *       Zwraca wynik Yamaha `system/getDeviceInfo`.
+   *       Endpoint zwraca informacje identyfikujące urządzenie, w tym model urządzenia,
+   *       wersje oprogramowania oraz numery seryjne udostępnione przez Yamaha API.
+   *     responses:
+   *       200:
+   *         description: Informacje identyfikacyjne i wersje oprogramowania urządzenia
+   *         content:
+   *           application/json:
+   *             schema:
+   *               $ref: '#/components/schemas/YamahaData'
+   *       500:
+   *         description: Error fetching device info
+   *       503:
+   *         description: Yamaha device unavailable
+   *         content:
+   *           application/json:
+   *             schema:
+   *               $ref: '#/components/schemas/ErrorResponse'
+   */
+  app.get('/device-info', async (req, res) => {
+    const client = getYamahaOrRespond(yamahaState, res);
+    if (!client) {
+      return;
+    }
+
+    try {
+      const deviceInfo = await client.getDeviceInfo();
+      res.json(deviceInfo);
+    } catch (error) {
+      logger.error({ err: error }, 'Error fetching device info.');
+      res.status(500).send('Error fetching device info');
+    }
+  });
+
+  /**
+   * @openapi
+   * /play-info:
+   *   get:
+   *     tags:
+   *       - Status
+   *     summary: Pobiera informacje o aktualnie odtwarzanym medium
+   *     description: |
+   *       Zwraca szczegóły dotyczące aktualnie odtwarzanego medium dla wskazanego źródła.
+   *       Parametr `input` może przyjąć wartości `cd`, `tuner` albo `server`.
+   *       Jeśli `input` nie zostanie przekazany, urządzenie zwróci informacje dla źródła `server` albo `usb`, zależnie od tego co jest aktualnie używane przez Yamaha API.
+   *     parameters:
+   *       - in: query
+   *         name: input
+   *         required: false
+   *         schema:
+   *           type: string
+   *           enum: [cd, tuner, server]
+   *         description: Źródło, dla którego mają zostać pobrane informacje o odtwarzaniu.
+   *     responses:
+   *       200:
+   *         description: Informacje o aktualnie odtwarzanym medium
+   *         content:
+   *           application/json:
+   *             schema:
+   *               $ref: '#/components/schemas/YamahaData'
+   *       500:
+   *         description: Error fetching play info
+   *       503:
+   *         description: Yamaha device unavailable
+   *         content:
+   *           application/json:
+   *             schema:
+   *               $ref: '#/components/schemas/ErrorResponse'
+   */
+  app.get('/play-info', async (req, res) => {
+    const client = getYamahaOrRespond(yamahaState, res);
+    if (!client) {
+      return;
+    }
+
+    try {
+      const input = getSingleValue( req.body?.input ?? req.query?.input);
+      const playInfo = await client.getPlayInfo(input);
+      res.json(playInfo);
+    } catch (error) {
+      logger.error({ err: error }, 'Error fetching play info.');
+      res.status(500).send('Error fetching play info');
+    }
+  });
+
+  /**
+   * @openapi
+   * /get-list-info:
+   *   get:
+   *     tags:
+   *       - Status
+   *     summary: Pobiera listę dostępnych serwerów DLNA
+   *     description: |
+   *       Zwraca listę dostępnych serwerów DLNA widocznych dla urządzenia Yamaha.
+   *       Aby pobrać tę listę, należy przekazać parametr `input` z wartością `server`.
+   *     parameters:
+   *       - in: query
+   *         name: input
+   *         required: true
+   *         schema:
+   *           type: string
+   *           enum: [server]
+   *         description: Typ źródła listy. Dla listy serwerów DLNA użyj wartości `server`.
+   *       - in: query
+   *         name: index
+   *         required: false
+   *         schema:
+   *           type: string
+   *         description: Indeks początkowy listy zwracanej przez API Yamaha.
+   *       - in: query
+   *         name: size
+   *         required: false
+   *         schema:
+   *           type: string
+   *         description: Maksymalna liczba elementów do pobrania.
+   *       - in: query
+   *         name: lang
+   *         required: false
+   *         schema:
+   *           type: string
+   *         description: Kod języka używany przez API Yamaha przy zwracaniu opisów.
+   *     responses:
+   *       200:
+   *         description: Lista dostępnych serwerów DLNA
+   *         content:
+   *           application/json:
+   *             schema:
+   *               $ref: '#/components/schemas/YamahaData'
+   *       500:
+   *         description: Error fetching list info
+   *       503:
+   *         description: Yamaha device unavailable
+   *         content:
+   *           application/json:
+   *             schema:
+   *               $ref: '#/components/schemas/ErrorResponse'
+   */
+  app.get('/get-list-info', async (req, res) => {
+    const client = getYamahaOrRespond(yamahaState, res);
+    if (!client) {
+      return;
+    }
+
+    const input = getSingleValue( req.body?.input ?? req.query?.input);
+    const index = getSingleValue( req.body?.index ?? req.query?.index);
+    const size = getSingleValue( req.body?.size ?? req.query?.size);
+    const lang = getSingleValue( req.body?.lang ?? req.query?.lang);
+    try {
+      const listInfo = await client.getListInfo(input, index, size, lang);
+      res.json(listInfo);
+    } catch (error) {
+      logger.error({ err: error }, 'Error fetching list info.');
+      res.status(500).send('Error fetching list info');
     }
   });
 }

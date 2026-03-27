@@ -7,6 +7,14 @@ export function getSingleValue(value: unknown): string | undefined {
     return trimmedValue.length > 0 ? trimmedValue : undefined;
   }
 
+  if (typeof value === 'boolean') {
+    return value ? 'true' : 'false';
+  }
+
+  if (typeof value === 'number') {
+    return value === 0 ? 'false' : 'true';
+  }
+
   if (Array.isArray(value)) {
     for (const entry of value) {
       if (typeof entry === 'string') {

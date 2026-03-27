@@ -339,12 +339,171 @@ export function registerControlEndpoints(app: Express, yamahaState: YamahaConnec
     }
 
     try {
+      const zone = getZone(req.body?.zone ?? req.query.zone);
       const mode = getSingleValue(req.body?.mode ?? req.query.mode);
-      await client.setInputTo(input, mode);
+      await client.setInput(input, zone, mode);
       res.json({ message: 'Input set' });
     } catch (error) {
       logger.error({ err: error }, 'Error setting input.');
       res.status(500).send('Error setting input');
     }
+  });
+
+  /**
+   * @openapi
+   * /set-playback:
+   *   post:
+   *     tags:
+   *       - Control
+   *     summary: Steruje odtwarzaniem dla netusb albo CD
+   *     parameters:
+   *       - in: query
+   *         name: command
+   *         schema:
+   *           type: string
+   *         description: Komenda odtwarzania. Obsługiwane wartości to `play`, `stop`, `pause`, `play_pause`, `previous`, `next`, `frw_start`, `frw_end`, `ffw_start`, `ffw_end`. Aliasy `frw_start`, `frw_end`, `ffw_start`, `ffw_end` są mapowane odpowiednio do `fast_reverse_start`, `fast_reverse_end`, `fast_forward_start`, `fast_forward_end`.
+   *       - in: query
+   *         name: input
+   *         schema:
+   *           type: string
+   *         description: Docelowe źródło odtwarzania. Jeśli ustawisz `cd`, backend wywoła `/cd/setPlayback`; dla każdej innej wartości lub braku parametru użyje `/netusb/setPlayback`.
+   *     requestBody:
+   *       required: false
+   *       content:
+   *         application/json:
+   *           schema:
+   *             $ref: '#/components/schemas/PlaybackRequest'
+   *     responses:
+   *       200:
+   *         description: Playback set successfully
+   *         content:
+   *           application/json:
+   *             schema:
+   *               $ref: '#/components/schemas/MessageResponse'
+   *       400:
+   *         description: Missing or invalid command
+   *         content:
+   *           application/json:
+   *             schema:
+   *               $ref: '#/components/schemas/ErrorResponse'
+   *       500:
+   *         description: Error setting playback
+   *       503:
+   *         description: Yamaha device unavailable
+   *         content:
+   *           application/json:
+   *             schema:
+   *               $ref: '#/components/schemas/ErrorResponse'
+   */
+  app.post('/set-playback', async (req, res) => {
+    const client = getYamahaOrRespond(yamahaState, res);
+    if (!client) {
+      return;
+    }
+
+    const command = getSingleValue(req.body?.command ?? req.query?.command);
+    if (!command) {
+      res.status(400).json({ message: 'A valid command is required.' });
+      return;
+    }
+
+    try {
+      const input = getSingleValue(req.body?.input ?? req.query?.input);      
+      await client.setPlayback(command, input);
+      res.json({ message: 'Playback set' });
+    } catch (error) {
+      logger.error({ err: error }, 'Error setting playback.');
+      res.status(500).send('Error setting playback');
+    }
+
+  });
+
+  /**
+   * @openapi
+   * /set-list-control:
+   *   post:
+   *     tags:
+   *       - Control
+   *     summary: Steruje wyborem elementu na liście netusb/DLNA
+   *     description: |
+   *       Przekazuje komendę `setListControl` do API Yamaha dla źródeł listowych, takich jak netusb.
+   *       Ten endpoint najprawdopodobniej służy między innymi do wyboru serwera DLNA, folderu albo pozycji z listy, ale semantyka pól `listId` i `type` nie została jeszcze zweryfikowana na urządzeniu.
+   *
+   *       TODO: dodać endpoint diagnostyczny lub scenariusz weryfikacji, który pokaże pełną strukturę list i dozwolone wartości sterujące.
+   *     parameters:
+   *       - in: query
+   *         name: listId
+   *         schema:
+   *           type: string
+   *         description: Identyfikator listy lub kontekstu listy zwracany przez API Yamaha/netusb.
+   *       - in: query
+   *         name: type
+   *         schema:
+   *           type: string
+   *         description: Typ akcji listowej przekazywany do Yamaha API. Dokładny zestaw wartości wymaga jeszcze weryfikacji na urządzeniu.
+   *       - in: query
+   *         name: index
+   *         schema:
+   *           type: number
+   *         description: Opcjonalny indeks elementu listy używany przez niektóre akcje.
+   *       - in: query
+   *         name: zone
+   *         schema:
+   *           type: string
+   *         description: Strefa urządzenia, domyślnie main.
+   *     requestBody:
+   *       required: false
+   *       content:
+   *         application/json:
+   *           schema:
+   *             $ref: '#/components/schemas/ListControlRequest'
+   *     responses:
+   *       200:
+   *         description: List control set successfully
+   *         content:
+   *           application/json:
+   *             schema:
+   *               $ref: '#/components/schemas/MessageResponse'
+   *       400:
+   *         description: Missing or invalid listId or type
+   *         content:
+   *           application/json:
+   *             schema:
+   *               $ref: '#/components/schemas/ErrorResponse'
+   *       500:
+   *         description: Error setting list control
+   *       503:
+   *         description: Yamaha device unavailable
+   *         content:
+   *           application/json:
+   *             schema:
+   *               $ref: '#/components/schemas/ErrorResponse'
+   */
+  app.post('/set-list-control', async (req, res) => {
+    const client = getYamahaOrRespond(yamahaState, res);
+    if (!client) {
+      return;
+    }
+
+    const listId = getSingleValue(req.body?.listId ?? req.query?.listId);
+    if (!listId) {
+      res.status(400).json({ message: 'A valid listId is required.' });
+      return;
+    }
+    const type = getSingleValue(req.body?.type ?? req.query?.type);
+    if (!type) {
+      res.status(400).json({ message: 'A valid type is required.' });
+      return;
+    }
+    const index = parseVolume(req.body?.index ?? req.query?.index);
+    const zone = getZone(req.body?.zone ?? req.query?.zone);
+
+    try {
+      await client.setListControl(listId, type, index, zone);
+      res.json({ message: 'List control set' });
+    } catch (error) {
+      logger.error({ err: error }, 'Error setting list control.');
+      res.status(500).send('Error setting list control');
+    } 
   });
 }

@@ -396,6 +396,48 @@ export function setupSwagger(app: Express, port: number) {
             },
             required: ['input']
           },
+          PlaybackRequest: {
+            type: 'object',
+            properties: {
+              command: {
+                type: 'string',
+                description: 'Komenda odtwarzania. Obsługiwane wartości: play, stop, pause, play_pause, previous, next, frw_start, frw_end, ffw_start, ffw_end.',
+                example: 'play'
+              },
+              input: {
+                type: 'string',
+                description: 'Docelowe źródło odtwarzania. Wartość cd kieruje komendę do /cd/setPlayback, a każda inna wartość lub brak pola do /netusb/setPlayback.',
+                example: 'cd'
+              }
+            },
+            required: ['command']
+          },
+          ListControlRequest: {
+            type: 'object',
+            properties: {
+              listId: {
+                type: 'string',
+                description: 'Identyfikator listy lub kontekstu listy zwracany przez API Yamaha/netusb.',
+                example: 'main'
+              },
+              type: {
+                type: 'string',
+                description: 'Typ akcji listowej przekazywany do Yamaha API. Zestaw dozwolonych wartości wymaga jeszcze weryfikacji na urządzeniu.',
+                example: 'select'
+              },
+              index: {
+                type: 'number',
+                description: 'Opcjonalny indeks elementu listy używany przez niektóre akcje.',
+                example: 0
+              },
+              zone: {
+                type: 'string',
+                description: 'Strefa urządzenia, domyślnie main.',
+                example: 'main'
+              }
+            },
+            required: ['listId', 'type']
+          },
           YamahaData: {
             type: 'object',
             additionalProperties: true
